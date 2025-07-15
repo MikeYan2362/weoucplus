@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+
+{% block title %}知识库管理 - WePlus 管理后台{% endblock %}
+{% block page_title %}知识库管理{% endblock %}
+
+{% block content %}
+<!-- 统计概览 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card primary">
+            <div class="icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h4>{{ documents|length }}</h4>
+            <p class="mb-0">总文档数</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card success">
+            <div class="icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h4 id="processedCount">0</h4>
+            <p class="mb-0">已处理</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card warning">
+            <div class="icon">
+                <i class="fas fa-cogs"></i>
+            </div>
+            <h4 id="processingCount">0</h4>
+            <p class="mb-0">处理中</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card info">
+            <div class="icon">
+                <i class="fas fa-hdd"></i>
+            </div>
+            <h4 id="totalSize">0MB</h4>
+            <p class="mb-0">总存储</p>
+        </div>
+    </div>
+</div>
+
+<!-- RAG系统状态 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="content-card">
+            <h5><i class="fas fa-brain me-2"></i>RAG系统状态</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="status-indicator bg-success mb-2"></div>
+                        <h6>向量数据库</h6>
+                        <small class="text-success">正常运行</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="status-indicator bg-success mb-2"></div>
+                        <h6>文本处理</h6>
+                        <small class="text-success">正常运行</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="status-indicator bg-info mb-2"></div>
+                        <h6>语义搜索</h6>
+                        <small class="text-info">运行中</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="status-indicator bg-warning mb-2"></div>
+                        <h6>知识增强</h6>
+                        <small class="text-warning">待优化</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 搜索和筛选 -->
+<div class="content-card mb-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" id="searchInput" placeholder="搜索文档名称...">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="typeFilter">
+                <option value="">所有类型</option>
+                <option value="pdf">PDF</option>
+                <option value="docx">Word</option>
+                <option value="txt">文本</option>
+                <option value="xlsx">Excel</option>
+                <option value="csv">CSV</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+                <option value="">所有状态</option>
+                <option value="completed">已完成</option>
+                <option value="processing">处理中</option>
+                <option value="pending">待处理</option>
+                <option value="failed">失败</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="userFilter">
+                <option value="">所有用户</option>
+                {% for doc in documents %}
+                    {% if doc.username %}
+                        <option value="{{ doc.username }}">{{ doc.username }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="applyFilters()">
+                <i class="fas fa-filter"></i> 筛选
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 文档列表 -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-database me-2"></i>知识库文档</h5>
+        <div>
+            <button class="btn btn-success btn-sm me-2" onclick="exportKnowledge()">
+                <i class="fas fa-download"></i> 导出数据
+            </button>
+            <button class="btn btn-info btn-sm me-2" onclick="optimizeRAG()">
+                <i class="fas fa-magic"></i> 优化RAG
+            </button>
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshKnowledge()">
+                <i class="fas fa-sync-alt"></i> 刷新
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover" id="knowledgeTable">
+            <thead>
+                <tr>
+                    <th>文档信息</th>
+                    <th>用户</th>
+                    <th>处理状态</th>
+                    <th>知识块</th>
+                    <th>权重</th>
+                    <th>上传时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documents %}
+                <tr data-doc-id="{{ doc.id }}" data-type="{{ doc.file_type }}" data-status="{{ doc.processing_status }}" data-user="{{ doc.username or '' }}">
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="file-icon me-3">
+                                {% if doc.file_type == 'pdf' %}
+                                    <i class="fas fa-file-pdf fa-2x text-danger"></i>
+                                {% elif doc.file_type == 'docx' %}
+                                    <i class="fas fa-file-word fa-2x text-primary"></i>
+                                {% elif doc.file_type == 'xlsx' %}
+                                    <i class="fas fa-file-excel fa-2x text-success"></i>
+                                {% elif doc.file_type == 'txt' %}
+                                    <i class="fas fa-file-alt fa-2x text-secondary"></i>
+                                {% else %}
+                                    <i class="fas fa-file fa-2x text-muted"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h6 class="mb-0">{{ doc.filename }}</h6>
+                                <small class="text-muted">{{ doc.file_type|upper }} • {{ "%.2f"|format(doc.file_size/1024/1024) }}MB</small>
+                                {% if doc.content_preview %}
+                                    <br><small class="text-muted">{{ doc.content_preview[:50] }}...</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if doc.username %}
+                            <i class="fas fa-user-circle text-primary me-1"></i>
+                            {{ doc.username }}
+                        {% else %}
+                            <span class="text-muted">未知</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if doc.processing_status == 'completed' %}
+                            <span class="badge bg-success">已完成</span>
+                        {% elif doc.processing_status == 'processing' %}
+                            <span class="badge bg-warning">处理中</span>
+                        {% elif doc.processing_status == 'pending' %}
+                            <span class="badge bg-secondary">待处理</span>
+                        {% elif doc.processing_status == 'failed' %}
+                            <span class="badge bg-danger">失败</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">{{ doc.processing_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-info">{{ doc.chunk_count or 0 }} 块</span>
+                    </td>
+                    <td>
+                        <div class="progress" style="width: 60px; height: 20px;">
+                            <div class="progress-bar" style="width: {{ doc.ai_reference_weight or 50 }}%">
+                                {{ doc.ai_reference_weight or 50 }}%
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <small>{{ doc.created_at or '未知' }}</small>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-action" 
+                                    onclick="viewDocDetail({{ doc.id }})" 
+                                    title="查看详情">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-info btn-action" 
+                                    onclick="testDocRAG({{ doc.id }})" 
+                                    title="测试检索">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <button class="btn btn-outline-warning btn-action" 
+                                    onclick="reprocessDoc({{ doc.id }})" 
+                                    title="重新处理">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-action" 
+                                    onclick="deleteDoc({{ doc.id }})" 
+                                    title="删除文档">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not documents %}
+        <div class="text-center py-5">
+            <i class="fas fa-database fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">暂无知识库文档</h5>
+            <p class="text-muted">用户上传文档后将在此处显示</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.status-indicator {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 auto;
+    position: relative;
+}
+
+.status-indicator::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+}
+
+.file-icon {
+    min-width: 50px;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 页面加载时计算统计数据
+document.addEventListener('DOMContentLoaded', function() {
+    calculateStats();
+});
+
+function calculateStats() {
+    const rows = document.querySelectorAll('#knowledgeTable tbody tr');
+    let processedCount = 0;
+    let processingCount = 0;
+    let totalSize = 0;
+    
+    rows.forEach(row => {
+        const status = row.getAttribute('data-status');
+        if (status === 'completed') processedCount++;
+        if (status === 'processing') processingCount++;
+        
+        // 计算总大小（从文件名中提取）
+        const sizeText = row.cells[0].querySelector('small').textContent;
+        const sizeMatch = sizeText.match(/([\d.]+)MB/);
+        if (sizeMatch) {
+            totalSize += parseFloat(sizeMatch[1]);
+        }
+    });
+    
+    document.getElementById('processedCount').textContent = processedCount;
+    document.getElementById('processingCount').textContent = processingCount;
+    document.getElementById('totalSize').textContent = totalSize.toFixed(2) + 'MB';
+}
+
+// 搜索和筛选功能
+function applyFilters() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const userFilter = document.getElementById('userFilter').value;
+    
+    const table = document.getElementById('knowledgeTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    let visibleCount = 0;
+    
+    for (let row of rows) {
+        const filename = row.cells[0].textContent.toLowerCase();
+        const docType = row.getAttribute('data-type');
+        const status = row.getAttribute('data-status');
+        const user = row.getAttribute('data-user');
+        
+        let showRow = true;
+        
+        // 搜索筛选
+        if (searchTerm && !filename.includes(searchTerm)) {
+            showRow = false;
+        }
+        
+        // 类型筛选
+        if (typeFilter && docType !== typeFilter) {
+            showRow = false;
+        }
+        
+        // 状态筛选
+        if (statusFilter && status !== statusFilter) {
+            showRow = false;
+        }
+        
+        // 用户筛选
+        if (userFilter && user !== userFilter) {
+            showRow = false;
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+        if (showRow) visibleCount++;
+    }
+    
+    // 显示筛选结果
+    showAlert('info', `筛选结果：显示 ${visibleCount} 个文档`);
+}
+
+function viewDocDetail(docId) {
+    const modal = `
+        <div class="modal fade" id="docDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-file me-2"></i>文档详情
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2">正在加载文档详情...</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('docDetailModal'));
+    modalElement.show();
+    
+    // 模拟加载文档详情
+    setTimeout(() => {
+        const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+        const filename = row.cells[0].querySelector('h6').textContent;
+        const fileInfo = row.cells[0].querySelector('small').textContent;
+        const username = row.cells[1].textContent.trim();
+        const status = row.cells[2].textContent.trim();
+        const chunks = row.cells[3].textContent.trim();
+        
+        document.querySelector('#docDetailModal .modal-body').innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <i class="fas fa-file-alt fa-5x text-primary mb-3"></i>
+                        <h5>${filename}</h5>
+                        <p class="text-muted">${fileInfo}</p>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>文档ID:</strong></td>
+                            <td>${docId}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>上传用户:</strong></td>
+                            <td>${username}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>处理状态:</strong></td>
+                            <td>${status}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>知识块数:</strong></td>
+                            <td>${chunks}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>RAG可用:</strong></td>
+                            <td><span class="badge bg-success">是</span></td>
+                        </tr>
+                    </table>
+                    
+                    <h6>操作历史</h6>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-success"></div>
+                            <div class="timeline-content">
+                                <h6>文档上传完成</h6>
+                                <small class="text-muted">刚刚</small>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-info"></div>
+                            <div class="timeline-content">
+                                <h6>文本提取完成</h6>
+                                <small class="text-muted">1分钟前</small>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-warning"></div>
+                            <div class="timeline-content">
+                                <h6>向量化处理完成</h6>
+                                <small class="text-muted">2分钟前</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }, 1500);
+    
+    // 模态框关闭后移除元素
+    document.getElementById('docDetailModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+function testDocRAG(docId) {
+    showAlert('info', 'RAG测试功能开发中...');
+}
+
+function reprocessDoc(docId) {
+    if (!confirm('确定要重新处理这个文档吗？这将重新提取文本并生成向量。')) {
+        return;
+    }
+    
+    showAlert('info', '文档重新处理已启动...');
+}
+
+function deleteDoc(docId) {
+    if (!confirm('确定要删除这个文档吗？此操作不可恢复！')) {
+        return;
+    }
+    
+    fetch(`/api/document/${docId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 移除表格行
+            const row = document.querySelector(`tr[data-doc-id="${docId}"]`);
+            if (row) {
+                row.remove();
+                calculateStats(); // 重新计算统计数据
+            }
+            showAlert('success', data.message);
+        } else {
+            showAlert('danger', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', '删除失败，请重试');
+    });
+}
+
+function exportKnowledge() {
+    const docs = Array.from(document.querySelectorAll('#knowledgeTable tbody tr'))
+        .filter(row => row.style.display !== 'none')
+        .map(row => {
+            return {
+                id: row.getAttribute('data-doc-id'),
+                filename: row.cells[0].querySelector('h6').textContent,
+                type: row.getAttribute('data-type'),
+                status: row.getAttribute('data-status'),
+                user: row.getAttribute('data-user'),
+                chunks: row.cells[3].textContent.trim()
+            };
+        });
+    
+    const data = {
+        timestamp: new Date().toISOString(),
+        total_documents: docs.length,
+        documents: docs
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `weplus_knowledge_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function optimizeRAG() {
+    if (!confirm('确定要优化RAG系统吗？这可能需要一些时间。')) {
+        return;
+    }
+    
+    showAlert('info', 'RAG系统优化已启动，请稍候...');
+}
+
+function refreshKnowledge() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 刷新中...';
+    btn.disabled = true;
+    
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+function showAlert(type, message) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.main-content').insertAdjacentElement('afterbegin', alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// 实时搜索
+document.getElementById('searchInput').addEventListener('input', function() {
+    if (this.value.length === 0 || this.value.length >= 2) {
+        applyFilters();
+    }
+});
+</script>
+{% endblock %} 

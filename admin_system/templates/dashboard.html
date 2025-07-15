@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - WePlus 管理后台{% endblock %}
+{% block page_title %}系统概览{% endblock %}
+
+{% block content %}
+<!-- 统计卡片 -->
+<div class="row">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="stats-card primary">
+            <div class="icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <h3>{{ stats.total_users or 0 }}</h3>
+            <p class="text-muted mb-0">注册用户总数</p>
+            <small class="text-success">
+                <i class="fas fa-check-circle"></i>
+                活跃用户: {{ stats.active_users or 0 }}
+            </small>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="stats-card success">
+            <div class="icon">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h3>{{ stats.total_chats or 0 }}</h3>
+            <p class="text-muted mb-0">聊天记录总数</p>
+            <small class="text-info">
+                <i class="fas fa-user-friends"></i>
+                参与用户: {{ stats.chatting_users or 0 }}
+            </small>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="stats-card warning">
+            <div class="icon">
+                <i class="fas fa-database"></i>
+            </div>
+            <h3>{{ stats.total_documents or 0 }}</h3>
+            <p class="text-muted mb-0">知识库文档</p>
+            <small class="text-primary">
+                <i class="fas fa-hdd"></i>
+                存储: {{ stats.total_storage_mb or 0 }}MB
+            </small>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="stats-card info">
+            <div class="icon">
+                <i class="fas fa-puzzle-piece"></i>
+            </div>
+            <h3>{{ stats.total_chunks or 0 }}</h3>
+            <p class="text-muted mb-0">知识块总数</p>
+            <small class="text-warning">
+                <i class="fas fa-cogs"></i>
+                RAG系统运行中
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- 图表和活动 -->
+<div class="row">
+    <!-- 聊天趋势图 -->
+    <div class="col-lg-8 mb-4">
+        <div class="content-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5><i class="fas fa-chart-line me-2"></i>聊天活动趋势</h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary active" onclick="updateChart('7days')">7天</button>
+                    <button class="btn btn-outline-primary" onclick="updateChart('30days')">30天</button>
+                </div>
+            </div>
+            <canvas id="chatTrendChart" height="100"></canvas>
+        </div>
+    </div>
+    
+    <!-- 文件类型分布 -->
+    <div class="col-lg-4 mb-4">
+        <div class="content-card">
+            <h5><i class="fas fa-chart-pie me-2"></i>文件类型分布</h5>
+            <canvas id="fileTypeChart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- 最近活动和系统状态 -->
+<div class="row">
+    <!-- 最近活动 -->
+    <div class="col-lg-6 mb-4">
+        <div class="content-card">
+            <h5><i class="fas fa-clock me-2"></i>最近用户活动</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>聊天次数</th>
+                            <th>最后活动</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if stats.recent_activities %}
+                            {% for activity in stats.recent_activities %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-user-circle text-primary me-2"></i>
+                                    {{ activity[0] or '未知用户' }}
+                                </td>
+                                <td>
+                                    <span class="badge badge-status bg-info">{{ activity[1] }} 次</span>
+                                </td>
+                                <td class="text-muted">
+                                    {{ activity[2] or '无记录' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    <i class="fas fa-inbox"></i> 暂无活动记录
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 系统状态 -->
+    <div class="col-lg-6 mb-4">
+        <div class="content-card">
+            <h5><i class="fas fa-server me-2"></i>系统状态</h5>
+            
+            <div class="status-item d-flex justify-content-between align-items-center py-2">
+                <span><i class="fas fa-database text-success me-2"></i>主数据库</span>
+                <span class="badge bg-success">正常</span>
+            </div>
+            
+            <div class="status-item d-flex justify-content-between align-items-center py-2">
+                <span><i class="fas fa-project-diagram text-success me-2"></i>向量数据库</span>
+                <span class="badge bg-success">正常</span>
+            </div>
+            
+            <div class="status-item d-flex justify-content-between align-items-center py-2">
+                <span><i class="fas fa-brain text-info me-2"></i>RAG系统</span>
+                <span class="badge bg-info">运行中</span>
+            </div>
+            
+            <div class="status-item d-flex justify-content-between align-items-center py-2">
+                <span><i class="fas fa-folder text-warning me-2"></i>文件存储</span>
+                <span class="badge bg-warning">{{ stats.total_storage_mb or 0 }}MB</span>
+            </div>
+            
+            <hr>
+            
+            <div class="text-center">
+                <button class="btn btn-primary btn-sm me-2" onclick="refreshStats()">
+                    <i class="fas fa-sync-alt"></i> 刷新数据
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="exportData()">
+                    <i class="fas fa-download"></i> 导出报告
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速操作 -->
+<div class="row">
+    <div class="col-12">
+        <div class="content-card">
+            <h5><i class="fas fa-lightning-bolt me-2"></i>快速操作</h5>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <a href="{{ url_for('users') }}" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-users d-block mb-2" style="font-size: 2rem;"></i>
+                        用户管理
+                    </a>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <a href="{{ url_for('knowledge') }}" class="btn btn-outline-success w-100">
+                        <i class="fas fa-database d-block mb-2" style="font-size: 2rem;"></i>
+                        知识库管理
+                    </a>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <a href="{{ url_for('files') }}" class="btn btn-outline-warning w-100">
+                        <i class="fas fa-folder d-block mb-2" style="font-size: 2rem;"></i>
+                        文件管理
+                    </a>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <button class="btn btn-outline-info w-100" onclick="showSystemInfo()">
+                        <i class="fas fa-info-circle d-block mb-2" style="font-size: 2rem;"></i>
+                        系统信息
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let chatTrendChart;
+let fileTypeChart;
+
+// 页面加载完成后初始化图表
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    loadChartData();
+});
+
+function initCharts() {
+    // 聊天趋势图
+    const ctx1 = document.getElementById('chatTrendChart').getContext('2d');
+    chatTrendChart = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '聊天次数',
+                data: [],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+
+    // 文件类型分布图
+    const ctx2 = document.getElementById('fileTypeChart').getContext('2d');
+    fileTypeChart = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#667eea',
+                    '#764ba2',
+                    '#f093fb',
+                    '#f5576c',
+                    '#4facfe',
+                    '#00f2fe'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function loadChartData() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('加载统计数据失败:', data.error);
+                return;
+            }
+
+            // 更新聊天趋势图
+            const chatTrend = data.chat_trend || [];
+            chatTrendChart.data.labels = chatTrend.map(item => item.date);
+            chatTrendChart.data.datasets[0].data = chatTrend.map(item => item.count);
+            chatTrendChart.update();
+
+            // 更新文件类型分布图
+            const fileTypes = data.file_types || [];
+            fileTypeChart.data.labels = fileTypes.map(item => item.type);
+            fileTypeChart.data.datasets[0].data = fileTypes.map(item => item.count);
+            fileTypeChart.update();
+        })
+        .catch(error => {
+            console.error('加载图表数据失败:', error);
+        });
+}
+
+function updateChart(period) {
+    // 更新按钮状态
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // 重新加载数据（这里可以根据period参数加载不同时间段的数据）
+    loadChartData();
+}
+
+function refreshStats() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 刷新中...';
+    btn.disabled = true;
+    
+    // 刷新页面数据
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+function exportData() {
+    // 导出统计数据
+    const statsCards = document.querySelectorAll('.stats-card h3');
+    const data = {
+        timestamp: new Date().toISOString(),
+        stats: {
+            total_users: parseInt(statsCards[0]?.textContent || '0'),
+            total_chats: parseInt(statsCards[1]?.textContent || '0'),
+            total_documents: parseInt(statsCards[2]?.textContent || '0'),
+            total_chunks: parseInt(statsCards[3]?.textContent || '0')
+        }
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `weplus_stats_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function showSystemInfo() {
+    const modal = `
+        <div class="modal fade" id="systemInfoModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-info-circle me-2"></i>系统信息
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>系统配置</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>数据库:</strong> SQLite + ChromaDB</li>
+                                    <li><strong>后端:</strong> Flask + FastAPI</li>
+                                    <li><strong>前端:</strong> Bootstrap 5</li>
+                                    <li><strong>AI模型:</strong> DeepSeek</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>存储信息</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>文档存储:</strong> {{ stats.total_storage_mb or 0 }}MB</li>
+                                    <li><strong>知识块:</strong> {{ stats.total_chunks or 0 }} 个</li>
+                                    <li><strong>用户数据:</strong> 本地存储</li>
+                                    <li><strong>向量数据:</strong> ChromaDB</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('systemInfoModal'));
+    modalElement.show();
+    
+    // 模态框关闭后移除元素
+    document.getElementById('systemInfoModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+</script>
+{% endblock %} 

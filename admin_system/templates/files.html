@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+
+{% block title %}文件管理 - WePlus 管理后台{% endblock %}
+{% block page_title %}文件管理{% endblock %}
+
+{% block content %}
+<!-- 统计概览 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card primary">
+            <div class="icon">
+                <i class="fas fa-file"></i>
+            </div>
+            <h4>{{ files|length }}</h4>
+            <p class="mb-0">总文件数</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card success">
+            <div class="icon">
+                <i class="fas fa-folder"></i>
+            </div>
+            <h4 id="folderCount">0</h4>
+            <p class="mb-0">目录数</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card warning">
+            <div class="icon">
+                <i class="fas fa-hdd"></i>
+            </div>
+            <h4 id="totalSize">0MB</h4>
+            <p class="mb-0">总大小</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card info">
+            <div class="icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <h4 id="recentFiles">0</h4>
+            <p class="mb-0">今日新增</p>
+        </div>
+    </div>
+</div>
+
+<!-- 文件操作工具栏 -->
+<div class="content-card mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" id="searchInput" placeholder="搜索文件名...">
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="typeFilter">
+                <option value="">所有类型</option>
+                <option value="pdf">PDF</option>
+                <option value="docx">Word</option>
+                <option value="txt">文本</option>
+                <option value="xlsx">Excel</option>
+                <option value="image">图片</option>
+                <option value="other">其他</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="sizeFilter">
+                <option value="">所有大小</option>
+                <option value="small">&lt; 1MB</option>
+                <option value="medium">1-10MB</option>
+                <option value="large">&gt; 10MB</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="dateFilter">
+                <option value="">所有时间</option>
+                <option value="today">今天</option>
+                <option value="week">本周</option>
+                <option value="month">本月</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="applyFilters()">
+                <i class="fas fa-filter"></i> 筛选
+            </button>
+        </div>
+    </div>
+    
+    <hr>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="btn-group" role="group">
+                <button class="btn btn-success" onclick="uploadFiles()">
+                    <i class="fas fa-upload"></i> 上传文件
+                </button>
+                <button class="btn btn-info" onclick="createFolder()">
+                    <i class="fas fa-folder-plus"></i> 新建文件夹
+                </button>
+                <button class="btn btn-warning" onclick="batchOperations()">
+                    <i class="fas fa-tasks"></i> 批量操作
+                </button>
+                <button class="btn btn-secondary" onclick="refreshFiles()">
+                    <i class="fas fa-sync-alt"></i> 刷新
+                </button>
+            </div>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-primary active" onclick="setViewMode('grid')" title="网格视图">
+                    <i class="fas fa-th"></i>
+                </button>
+                <button class="btn btn-outline-primary" onclick="setViewMode('list')" title="列表视图">
+                    <i class="fas fa-list"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 面包屑导航 -->
+<div class="content-card mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="#" onclick="navigateToPath('')">
+                    <i class="fas fa-home"></i> 根目录
+                </a>
+            </li>
+            <li class="breadcrumb-item active" id="currentPath">uploads</li>
+        </ol>
+    </nav>
+</div>
+
+<!-- 文件列表 -->
+<div class="content-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-folder-open me-2"></i>文件浏览器</h5>
+        <div>
+            <span class="text-muted">共 <span id="fileCount">{{ files|length }}</span> 个文件</span>
+        </div>
+    </div>
+
+    <!-- 网格视图 -->
+    <div id="gridView" class="row">
+        {% for file in files %}
+        <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 mb-3 file-item" 
+             data-name="{{ file.name }}" 
+             data-type="{{ file.type or 'unknown' }}" 
+             data-size="{{ file.size }}"
+             data-modified="{{ file.modified }}">
+            <div class="card file-card h-100">
+                <div class="card-body text-center p-3">
+                    <div class="file-icon mb-2">
+                        {% set ext = file.name.split('.')[-1].lower() if '.' in file.name else 'unknown' %}
+                        {% if ext in ['pdf'] %}
+                            <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                        {% elif ext in ['doc', 'docx'] %}
+                            <i class="fas fa-file-word fa-3x text-primary"></i>
+                        {% elif ext in ['xls', 'xlsx'] %}
+                            <i class="fas fa-file-excel fa-3x text-success"></i>
+                        {% elif ext in ['ppt', 'pptx'] %}
+                            <i class="fas fa-file-powerpoint fa-3x text-warning"></i>
+                        {% elif ext in ['txt', 'md'] %}
+                            <i class="fas fa-file-alt fa-3x text-secondary"></i>
+                        {% elif ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp'] %}
+                            <i class="fas fa-file-image fa-3x text-info"></i>
+                        {% elif ext in ['mp4', 'avi', 'mov'] %}
+                            <i class="fas fa-file-video fa-3x text-purple"></i>
+                        {% elif ext in ['mp3', 'wav', 'flac'] %}
+                            <i class="fas fa-file-audio fa-3x text-pink"></i>
+                        {% elif ext in ['zip', 'rar', '7z'] %}
+                            <i class="fas fa-file-archive fa-3x text-dark"></i>
+                        {% else %}
+                            <i class="fas fa-file fa-3x text-muted"></i>
+                        {% endif %}
+                    </div>
+                    <h6 class="card-title text-truncate" title="{{ file.name }}">{{ file.name }}</h6>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            {{ "%.2f"|format(file.size/1024/1024) }}MB<br>
+                            {{ file.modified.strftime('%Y-%m-%d') }}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer p-2">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-outline-primary btn-sm" onclick="viewFile('{{ file.path }}')" title="查看">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="downloadFile('{{ file.path }}')" title="下载">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteFile('{{ file.path }}')" title="删除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 列表视图 -->
+    <div id="listView" class="d-none">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        </th>
+                        <th>文件名</th>
+                        <th>类型</th>
+                        <th>大小</th>
+                        <th>修改时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                    <tr class="file-row" 
+                        data-name="{{ file.name }}" 
+                        data-type="{{ file.type or 'unknown' }}" 
+                        data-size="{{ file.size }}"
+                        data-modified="{{ file.modified }}">
+                        <td>
+                            <input type="checkbox" class="file-checkbox" value="{{ file.path }}">
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% set ext = file.name.split('.')[-1].lower() if '.' in file.name else 'unknown' %}
+                                {% if ext in ['pdf'] %}
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                {% elif ext in ['doc', 'docx'] %}
+                                    <i class="fas fa-file-word text-primary me-2"></i>
+                                {% elif ext in ['xls', 'xlsx'] %}
+                                    <i class="fas fa-file-excel text-success me-2"></i>
+                                {% elif ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                                    <i class="fas fa-file-image text-info me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-file text-muted me-2"></i>
+                                {% endif %}
+                                <span>{{ file.name }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ file.type or 'unknown' }}</span>
+                        </td>
+                        <td>{{ "%.2f"|format(file.size/1024/1024) }}MB</td>
+                        <td>{{ file.modified.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="viewFile('{{ file.path }}')" title="查看">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-success" onclick="downloadFile('{{ file.path }}')" title="下载">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="renameFile('{{ file.path }}')" title="重命名">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteFile('{{ file.path }}')" title="删除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if not files %}
+    <div class="text-center py-5">
+        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+        <h5 class="text-muted">此目录为空</h5>
+        <p class="text-muted">上传文件或创建文件夹开始使用</p>
+        <button class="btn btn-primary" onclick="uploadFiles()">
+            <i class="fas fa-upload"></i> 上传文件
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.file-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.file-icon {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-row:hover {
+    background-color: rgba(0,123,255,0.05);
+}
+
+.breadcrumb {
+    background: none;
+    padding: 0;
+}
+
+.breadcrumb-item a {
+    text-decoration: none;
+    color: #007bff;
+}
+
+.breadcrumb-item a:hover {
+    text-decoration: underline;
+}
+
+.text-purple { color: #6f42c1; }
+.text-pink { color: #e83e8c; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 页面加载时计算统计数据
+document.addEventListener('DOMContentLoaded', function() {
+    calculateStats();
+});
+
+function calculateStats() {
+    const files = document.querySelectorAll('.file-item, .file-row');
+    let totalSize = 0;
+    let recentFiles = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    files.forEach(file => {
+        const size = parseInt(file.getAttribute('data-size') || '0');
+        totalSize += size;
+        
+        const modified = new Date(file.getAttribute('data-modified'));
+        if (modified >= today) {
+            recentFiles++;
+        }
+    });
+    
+    document.getElementById('totalSize').textContent = (totalSize / (1024 * 1024)).toFixed(2) + 'MB';
+    document.getElementById('recentFiles').textContent = recentFiles;
+    document.getElementById('folderCount').textContent = '1'; // 简化处理
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+    const sizeFilter = document.getElementById('sizeFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+    
+    const isGridView = !document.getElementById('gridView').classList.contains('d-none');
+    const items = isGridView ? 
+        document.querySelectorAll('.file-item') : 
+        document.querySelectorAll('.file-row');
+    
+    let visibleCount = 0;
+    
+    items.forEach(item => {
+        const name = item.getAttribute('data-name').toLowerCase();
+        const type = item.getAttribute('data-type');
+        const size = parseInt(item.getAttribute('data-size'));
+        const modified = new Date(item.getAttribute('data-modified'));
+        
+        let showItem = true;
+        
+        // 搜索筛选
+        if (searchTerm && !name.includes(searchTerm)) {
+            showItem = false;
+        }
+        
+        // 类型筛选
+        if (typeFilter) {
+            const fileExt = name.split('.').pop();
+            let matchType = false;
+            
+            switch (typeFilter) {
+                case 'pdf':
+                    matchType = fileExt === 'pdf';
+                    break;
+                case 'docx':
+                    matchType = ['doc', 'docx'].includes(fileExt);
+                    break;
+                case 'txt':
+                    matchType = ['txt', 'md'].includes(fileExt);
+                    break;
+                case 'xlsx':
+                    matchType = ['xls', 'xlsx'].includes(fileExt);
+                    break;
+                case 'image':
+                    matchType = ['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(fileExt);
+                    break;
+                case 'other':
+                    matchType = !['pdf', 'doc', 'docx', 'txt', 'md', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif'].includes(fileExt);
+                    break;
+            }
+            
+            if (!matchType) showItem = false;
+        }
+        
+        // 大小筛选
+        if (sizeFilter) {
+            const sizeMB = size / (1024 * 1024);
+            switch (sizeFilter) {
+                case 'small':
+                    if (sizeMB >= 1) showItem = false;
+                    break;
+                case 'medium':
+                    if (sizeMB < 1 || sizeMB > 10) showItem = false;
+                    break;
+                case 'large':
+                    if (sizeMB <= 10) showItem = false;
+                    break;
+            }
+        }
+        
+        // 日期筛选
+        if (dateFilter) {
+            const now = new Date();
+            let cutoffDate = new Date();
+            
+            switch (dateFilter) {
+                case 'today':
+                    cutoffDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'week':
+                    cutoffDate.setDate(now.getDate() - 7);
+                    break;
+                case 'month':
+                    cutoffDate.setMonth(now.getMonth() - 1);
+                    break;
+            }
+            
+            if (modified < cutoffDate) showItem = false;
+        }
+        
+        item.style.display = showItem ? '' : 'none';
+        if (showItem) visibleCount++;
+    });
+    
+    document.getElementById('fileCount').textContent = visibleCount;
+    showAlert('info', `筛选结果：显示 ${visibleCount} 个文件`);
+}
+
+function setViewMode(mode) {
+    const gridView = document.getElementById('gridView');
+    const listView = document.getElementById('listView');
+    const buttons = document.querySelectorAll('[onclick*="setViewMode"]');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (mode === 'grid') {
+        gridView.classList.remove('d-none');
+        listView.classList.add('d-none');
+        event.target.classList.add('active');
+    } else {
+        gridView.classList.add('d-none');
+        listView.classList.remove('d-none');
+        event.target.classList.add('active');
+    }
+}
+
+function uploadFiles() {
+    const modal = `
+        <div class="modal fade" id="uploadModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-upload me-2"></i>上传文件
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="upload-area border-dashed p-4 text-center">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h6>拖拽文件到此处或点击选择</h6>
+                            <input type="file" class="form-control" multiple>
+                            <small class="text-muted">支持多文件上传，最大50MB</small>
+                        </div>
+                        <div class="mt-3">
+                            <div class="progress d-none">
+                                <div class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="startUpload()">开始上传</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('uploadModal'));
+    modalElement.show();
+    
+    // 模态框关闭后移除元素
+    document.getElementById('uploadModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+function createFolder() {
+    const folderName = prompt('请输入文件夹名称:');
+    if (folderName && folderName.trim()) {
+        showAlert('success', `文件夹 "${folderName}" 创建成功`);
+        // 这里应该调用后端API创建文件夹
+    }
+}
+
+function batchOperations() {
+    const selectedFiles = document.querySelectorAll('.file-checkbox:checked');
+    if (selectedFiles.length === 0) {
+        showAlert('warning', '请先选择要操作的文件');
+        return;
+    }
+    
+    const modal = `
+        <div class="modal fade" id="batchModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-tasks me-2"></i>批量操作
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>已选择 <strong>${selectedFiles.length}</strong> 个文件</p>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-success" onclick="batchDownload()">
+                                <i class="fas fa-download"></i> 批量下载
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="batchMove()">
+                                <i class="fas fa-folder"></i> 移动到文件夹
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="batchDelete()">
+                                <i class="fas fa-trash"></i> 批量删除
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('batchModal'));
+    modalElement.show();
+    
+    // 模态框关闭后移除元素
+    document.getElementById('batchModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+function viewFile(filePath) {
+    showAlert('info', '文件预览功能开发中...');
+}
+
+function downloadFile(filePath) {
+    showAlert('info', `正在下载文件: ${filePath}`);
+}
+
+function renameFile(filePath) {
+    const newName = prompt('请输入新的文件名:');
+    if (newName && newName.trim()) {
+        showAlert('success', `文件重命名为: ${newName}`);
+    }
+}
+
+function deleteFile(filePath) {
+    if (!confirm('确定要删除这个文件吗？')) {
+        return;
+    }
+    
+    showAlert('success', `文件 ${filePath} 已删除`);
+    // 这里应该调用后端API删除文件，然后移除DOM元素
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+function refreshFiles() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 刷新中...';
+    btn.disabled = true;
+    
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+function showAlert(type, message) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.main-content').insertAdjacentElement('afterbegin', alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// 实时搜索
+document.getElementById('searchInput').addEventListener('input', function() {
+    if (this.value.length === 0 || this.value.length >= 2) {
+        applyFilters();
+    }
+});
+
+// 拖拽上传功能
+document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        showAlert('info', `检测到 ${files.length} 个文件，请使用上传功能处理`);
+    }
+});
+</script>
+{% endblock %} 
