@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX渲染修复测试</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .test-result {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 LaTeX渲染修复测试页面</h1>
+    
+    <button onclick="runFullTest()">🚀 运行完整测试</button>
+    <button onclick="clearResults()">🧹 清空结果</button>
+    
+    <div id="results"></div>
+
+    <script>
+        // 修复后的渲染函数
+        function renderMarkdown(content) {
+            if (!content || typeof content !== 'string') {
+                return content || '';
+            }
+            
+            console.log('🎯 开始渲染，原始内容:', content);
+            
+            // 第一步：保护数学公式为代码块
+            let processed = content;
+            
+            // 保护显示公式 $$...$$ 
+            processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, '`$$$1$$`');
+            
+            // 保护 \[...\] 显示公式
+            processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, '`\\[$1\\]`');
+            
+            // 保护内联公式 $...$
+            processed = processed.replace(/\$([^$\n]+?)\$/g, '`$$1$`');
+            
+            // 保护 \(...\) 内联公式
+            processed = processed.replace(/\\\(([^)]*?)\\\)/g, '`\\($1\\)`');
+            
+            console.log('🛡️ 保护数学公式后:', processed);
+            
+            // 第二步：处理代码块
+            processed = processed.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                const language = lang || 'text';
+                return `<pre><code class="language-${language}">${escapeHtml(code.trim())}</code></pre>`;
+            });
+            
+            // 第三步：使用marked处理Markdown
+            let html = marked.parse(processed);
+            console.log('📝 Markdown处理后:', html);
+            
+            // 第四步：恢复数学公式并移除代码标签
+            // 恢复显示公式 $$...$$ 
+            html = html.replace(/<code>\$\$([\s\S]*?)\$\$<\/code>/g, '$$$$1$$');
+            
+            // 恢复 \[...\] 显示公式
+            html = html.replace(/<code>\\\[([\s\S]*?)\\\]<\/code>/g, '\\[$1\\]');
+            
+            // 恢复内联公式 $...$
+            html = html.replace(/<code>\$([^$]*?)\$<\/code>/g, '$$$1$$');
+            
+            // 恢复 \(...\) 内联公式  
+            html = html.replace(/<code>\\\(([^)]*?)\\\)<\/code>/g, '\\($1\\)');
+            
+            console.log('✅ 数学公式恢复后:', html);
+            
+            return html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function runTest(title, input, description) {
+            const resultsDiv = document.getElementById('results');
+            
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-section';
+            
+            testDiv.innerHTML = `
+                <div class="test-title">${title}</div>
+                <div><strong>输入:</strong> ${escapeHtml(input)}</div>
+                <div><strong>说明:</strong> ${description}</div>
+                <div class="test-result" id="result_${Date.now()}">渲染中...</div>
+            `;
+            
+            resultsDiv.appendChild(testDiv);
+            
+            const resultDiv = testDiv.querySelector('.test-result');
+            
+            try {
+                const rendered = renderMarkdown(input);
+                resultDiv.innerHTML = rendered;
+                
+                // 应用KaTeX渲染
+                setTimeout(() => {
+                    renderMathInElement(resultDiv, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "\\[", right: "\\]", display: true},
+                            {left: "$", right: "$", display: false},
+                            {left: "\\(", right: "\\)", display: false}
+                        ],
+                        throwOnError: false,
+                        strict: false
+                    });
+                }, 10);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<span style="color: red;">错误: ${error.message}</span>`;
+            }
+        }
+
+        function runFullTest() {
+            clearResults();
+            
+            // 测试用例
+            const tests = [
+                {
+                    title: "1. 基本内联公式",
+                    input: "这是一个内联公式 $x^2 + y^2 = z^2$ 在句子中。",
+                    description: "应该显示勾股定理公式"
+                },
+                {
+                    title: "2. 显示公式",
+                    input: "这是一个显示公式：\n\n$$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$\n\n高斯积分。",
+                    description: "应该显示居中的高斯积分公式"
+                },
+                {
+                    title: "3. 希腊字母组合",
+                    input: "希腊字母测试：$\\alpha + \\beta = \\gamma$, $\\pi \\approx 3.14159$",
+                    description: "应该显示希腊字母"
+                },
+                {
+                    title: "4. 分数与根号",
+                    input: "分数：$\\frac{a}{b} + \\frac{c}{d}$ 和根号：$\\sqrt{x^2 + y^2}$",
+                    description: "应该显示分数和根号"
+                },
+                {
+                    title: "5. 求和与积分",
+                    input: "求和：$\\sum_{i=1}^{n} x_i$ 和积分：$\\int_a^b f(x)dx$",
+                    description: "应该显示求和和积分符号"
+                },
+                {
+                    title: "6. 矩阵",
+                    input: "矩阵：$$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$",
+                    description: "应该显示2x2矩阵"
+                },
+                {
+                    title: "7. 混合文本和公式",
+                    input: "**粗体文本** 和公式 $E = mc^2$，还有*斜体* $F = ma$。",
+                    description: "应该正确显示Markdown格式和LaTeX公式的混合"
+                },
+                {
+                    title: "8. 你提到的问题案例",
+                    input: "上下标：$x^2$ → MATH_INLINE_29\n下标：$a_n$ → MATH_INLINE_30\n组合：$C_n^k$ → MATH_INLINE_31",
+                    description: "这些不应该显示MATH_INLINE_XX，而应该显示正确的数学公式"
+                }
+            ];
+            
+            tests.forEach(test => {
+                runTest(test.title, test.input, test.description);
+            });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // 页面加载完成后自动运行测试
+        window.addEventListener('load', () => {
+            console.log('📚 LaTeX修复测试页面已加载');
+            setTimeout(runFullTest, 500);
+        });
+    </script>
+</body>
+</html> 

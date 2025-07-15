@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数学公式测试</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/contrib/auto-render.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            line-height: 1.6;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .original {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .rendered {
+            background-color: #f8f8f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>数学公式渲染测试</h1>
+    
+    <div class="test-section">
+        <h3>测试用例1：切比雪夫不等式</h3>
+        <div class="original">
+            <strong>原始文本：</strong>
+            <pre id="original1">对于任意随机变量 ( X )（期望 ( \mu )，方差 ( \sigma^2 )）和任意 ( k > 0 )，有：
+[
+P\left( |X - \mu| \geq k \sigma \right) \leq \frac{1}{k^2}
+]</pre>
+        </div>
+        <div class="rendered" id="rendered1"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试用例2：方差定义</h3>
+        <div class="original">
+            <strong>原始文本：</strong>
+            <pre id="original2">方差 ( \sigma^2 ) 的定义为：
+[
+\sigma^2 = E\left[ (X - \mu)^2 \right]
+]</pre>
+        </div>
+        <div class="rendered" id="rendered2"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试用例3：标准格式</h3>
+        <div class="original">
+            <strong>原始文本：</strong>
+            <pre id="original3">标准LaTeX格式：
+$$P(X > \mu) = \frac{1}{2}$$</pre>
+        </div>
+        <div class="rendered" id="rendered3"></div>
+    </div>
+
+    <script>
+        // 渲染Markdown内容（复制chat.html中的函数）
+        function renderMarkdown(content) {
+            // 预处理数学公式：将方括号格式转换为双美元符号格式
+            let processedContent = content;
+            
+            // 处理独立行的方括号数学公式（各种可能的换行格式）
+            processedContent = processedContent.replace(/(?:^|\n)\s*\[\s*\n([\s\S]*?)\n\s*\]\s*(?=\n|$)/gm, (match, formula) => {
+                console.log('转换方括号数学公式1:', match, '->', '$$' + formula + '$$');
+                return '\n$$\n' + formula + '\n$$\n';
+            });
+            
+            // 处理紧凑格式的方括号数学公式
+            processedContent = processedContent.replace(/(?:^|\n)\s*\[([\s\S]*?)\]\s*(?=\n|$)/gm, (match, formula) => {
+                // 只有当方括号内容包含LaTeX命令时才转换
+                if (formula.includes('\\') || formula.includes('{') || formula.includes('}')) {
+                    console.log('转换方括号数学公式2:', match, '->', '$$' + formula.trim() + '$$');
+                    return '\n$$\n' + formula.trim() + '\n$$\n';
+                }
+                return match; // 否则保持原样
+            });
+            
+            console.log('处理后的内容:', processedContent);
+            
+            return marked.parse(processedContent);
+        }
+
+        // 配置marked
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // 测试函数
+        function testMath() {
+            for (let i = 1; i <= 3; i++) {
+                const originalElement = document.getElementById(`original${i}`);
+                const renderedElement = document.getElementById(`rendered${i}`);
+                
+                const originalText = originalElement.textContent;
+                console.log(`测试${i} - 原始文本:`, originalText);
+                
+                const renderedHTML = renderMarkdown(originalText);
+                console.log(`测试${i} - 渲染后HTML:`, renderedHTML);
+                
+                renderedElement.innerHTML = renderedHTML;
+                
+                // 渲染数学公式
+                setTimeout(() => {
+                    renderMathInElement(renderedElement, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "\\[", right: "\\]", display: true},
+                            {left: "$", right: "$", display: false},
+                            {left: "\\(", right: "\\)", display: false}
+                        ],
+                        throwOnError: false
+                    });
+                }, 100);
+            }
+        }
+
+        // 页面加载完成后运行测试
+        document.addEventListener('DOMContentLoaded', testMath);
+    </script>
+</body>
+</html> 
